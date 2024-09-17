@@ -46,8 +46,12 @@ async def handle_help():
 - 复杂指令
     /撤回 <num1>[-num2]：撤回 Bot 区间内（倒数，从 0 开始数起，前闭后开）的所有消息
     @ /wordle [-l] [-d]：开始一局 wordle 游戏。-l 指定长度 -d 指定词典 【支持词典：GRE、考研、GMAT、专四、TOEFL、SAT、专八、IELTS、CET4、CET6】
+    /calc [num]：开始一局计算器游戏。带参数表示选定第几关，否则为随机。
+    /m bind [好友码]：舞萌查分器。绑定舞萌游戏数据
+        /m b50：查询 Best 50
+        使用舞萌查分器之前请访问 https://github.com/KomoriDev/nonebot-plugin-lxns-maimai/wiki
 - 交互指令
-    /表情包制作：根据接下来的提示制作表情包。配套命令：
+    /表情包制作：根据接下来的提示制作表情包
         /表情详情 <表情名/关键词>
         /表情搜索 <关键词>
     /字符画 [图片]：接下来发送图片生成字符画
@@ -66,7 +70,9 @@ by 柚初 Yurchiu Rin"""
     txt2img.set_font_size(font_size)
     pic = txt2img.draw(title, text)
     helpmsg = MessageSegment.image(pic)
-    await help.finish(helpmsg)
+    await help.send(helpmsg)
+    await help.finish(f"""项目地址：https://github.com/Yurchiu/YurchiuBot
+舞萌查分器（第三方）：https://github.com/KomoriDev/nonebot-plugin-lxns-maimai/wiki""")
 
 
 
