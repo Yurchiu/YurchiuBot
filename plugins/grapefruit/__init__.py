@@ -24,6 +24,8 @@ from nonebot_plugin_alconna.uniseg import UniMessage, At
 import time
 import random
 from nonebot import logger
+from dotenv import load_dotenv
+import os
 
 
 
@@ -85,6 +87,11 @@ Grapefruit = on_alconna(
         ),
         Option(
             "二次元图",
+        ),
+        Subcommand(
+            "管理",
+            Args["target", At],
+            Args["number", int],
         ),
     )
 )
@@ -213,10 +220,11 @@ async def handle_grapefruit(bot: Bot, groupevent: GroupMessageEvent, session: as
     排行：输出本群柚子瓣数排行榜
 - 功能子指令
     二次元图：（花费 25 柚子瓣）发送二次元图
+    管理 <@> <num>：（仅超级管理员）修改柚子瓣数目
 - 柚子瓣其他用途：
     戳一戳随机赠送
 - 注意事项：
-    连续签到可以对签到获得、抢成功柚子瓣有增益。签到天数在跨年时归零。多次抢柚子瓣成功概率会降低。戳 Bot 得到的柚子瓣数期望为 -1，所以别戳啦！
+    连续签到可以对签到获得、抢成功柚子瓣有增益。签到天数在跨年时归零。多次抢柚子瓣成功概率会降低。相关命令只能在群里使用。戳 Bot 得到的柚子瓣数期望为 -1，所以别戳啦！
 
 by 柚初 Yurchiu Rin"""
 
@@ -272,6 +280,25 @@ by 柚初 Yurchiu Rin"""
         pic = txt2img.draw(title, text)
         printImg = MessageSegment.image(pic)
         await Grapefruit.send(printImg)
+
+
+    elif result.find("管理"):
+
+        load_dotenv(".env")
+        SUPERUSERS = os.getenv("SUPERUSERS")
+        if curUser not in SUPERUSERS:
+            await Grapefruit.finish("无权限。")
+        
+        curAt = result.query[At]("管理.target").target
+        if not(await session.get(grapefruit, curAt)):
+            data2.userName = curAt
+            session.add(data2)
+            session.commit()
+
+        data2 = await session.get(grapefruit, curAt)
+        giveNumber = result.query[int]("管理.number")
+        data2.gfNumber += giveNumber
+        await Grapefruit.send(f"管理员：对方柚子瓣变动 {giveNumber}，目前有 {data2.gfNumber} 个柚子瓣。")
 
     await session.commit()
 
