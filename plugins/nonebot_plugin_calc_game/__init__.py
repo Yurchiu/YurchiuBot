@@ -14,10 +14,18 @@ import re
 from nonebot import logger
 
 __plugin_meta__ = PluginMetadata(
-    name="calc",
-    description="",
-    usage="",
+    name="计算器：游戏",
+    description="这是利用 QQ 机器人复刻 计算器：游戏 的一个插件。游戏玩法：通过给出的操作方式由当前数字达到计算目标，分步直接发送机器人给出的“操作方式”中的单引号内内容。",
+    usage="/calc [num|帮助|结束] 如果带 num 参数表示抽取指定谜题，否则为随机抽取。",
+    type="application",
+    homepage="https://github.com/Yurchiu/nonebot-plugin-calc-game",
     config=Config,
+    supported_adapters={"~onebot.v11","~onebot.v12"},
+    extra={
+        "unique_name": "calc game",
+        "author": "Yurchiu <Yurchiu@outlook.com>",
+        "version": "0.0.1",
+    },
 )
 
 global_config = get_driver().config
@@ -180,10 +188,18 @@ calcData = [
     [153, 18, 5, 9, "*3", "sum", "inv10"],
     [154, 101, 5, 12, "+4", "inv10", "sum"],
     [155, 99, 6, 26, "push2", "sum", "inv10"],
-    [156, 13, 7, 15, "sum", "inv10", "mir"]
+    [156, 13, 7, 15, "sum", "inv10", "mir"],
+    [157, 99, 6, 78, "1=>6", "6=>11", "/6", "inv10", "rev"],
+    [158, 9, 4, 34, "*6", "inv10", "<<"],
+    [159, 872, 8, 0, "push8", "88=>34", "inv10", "<<"],
+    [160, 33, 5, 5, "*7", "+8", "-9", "*2", "inv10"],
+    [161, 23, 6, 12, "*5", "sum", "store", "inv10"],
+    [162, 1991, 4, 1, "store", "inv10"],
+    [163, 26, 4, 12, "<<", "sum", "store", "inv10"],
+    [164, 48, 6, 51, "+6", "*3", "inv10", "rev", "4=>6"]
 ]
 
-totalData = 156
+totalData = 164
 
 helpMsg = f"""通过给出的操作方式由当前数字达到计算目标。分步直接发送“操作方式”中的单引号内内容。
 
@@ -347,7 +363,7 @@ async def _(groupevent: GroupMessageEvent, args: Message = CommandArg()):
     curStep[curGroup] = choice[2]
     curNum[curGroup] = choice[3]
     CUROPT[curGroup] = choice[4:]
-    initMsg = f"目前数字：{curNum[curGroup]}\n计算目标：{curTar[curGroup]}\n剩余步数：{curStep[curGroup]}\n操作方式：{CUROPT[curGroup]}\n\n查看帮助请使用 /calc 帮助，结束游戏请使用 /calc 结束。"
+    initMsg = f"当前数字：{curNum[curGroup]}\n计算目标：{curTar[curGroup]}\n剩余步数：{curStep[curGroup]}\n操作方式：{CUROPT[curGroup]}\n\n查看帮助请使用 /calc 帮助，结束游戏请使用 /calc 结束。"
     await Calc.send(sendPic(initMsg, title=f"谜题 #{curId}"))
 
 
@@ -526,7 +542,7 @@ async def handleOpt(groupevent: GroupMessageEvent, event: Event):
             curNum[curGroup] = sign * int(temp)
 
 
-        status = f"目前数字：{curNum[curGroup]}\n计算目标：{curTar[curGroup]}\n剩余步数：{curStep[curGroup]}\n操作方式：{CUROPT[curGroup]}"
+        status = f"当前数字：{curNum[curGroup]}\n计算目标：{curTar[curGroup]}\n剩余步数：{curStep[curGroup]}\n操作方式：{CUROPT[curGroup]}"
 
         if curNum[curGroup] == curTar[curGroup]:
             NOTGAME[curGroup] = True
