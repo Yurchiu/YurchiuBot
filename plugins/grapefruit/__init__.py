@@ -8,7 +8,7 @@ from .config import Config
 from sqlalchemy import select
 from nonebot.adapters import Event
 from nonebot.params import CommandArg
-from nonebot.adapters.onebot.v11 import GroupMessageEvent,MessageSegment
+from nonebot.adapters.onebot.v11 import GroupMessageEvent, MessageSegment
 from nonebot.adapters.onebot.v12 import Bot
 from nonebot.adapters import Bot
 import httpx
@@ -20,13 +20,13 @@ require("nonebot_plugin_txt2img")
 from nonebot_plugin_txt2img import Txt2Img
 from nonebot_plugin_alconna import on_alconna, AlconnaMatch, Query, Match, UniMessage, At, AlcResult, AlconnaMatches
 from arclet.alconna import Alconna, Args, Option, Arparma, Subcommand
-from nonebot_plugin_alconna.uniseg import UniMessage, At
+from nonebot_plugin_alconna.uniseg import UniMessage, At, Image
 import time
 import random
 from nonebot import logger
 from dotenv import load_dotenv
 import os
-
+from nonebot_plugin_userinfo import get_user_info
 
 
 __plugin_meta__ = PluginMetadata(
@@ -56,6 +56,8 @@ class grapefruit(Model):
     ifCheck: Mapped[int]
     combo: Mapped[int]
     robNumber: Mapped[int]
+    waifu: Mapped[str]
+    ifMerried: Mapped[int]
     # junk: Mapped[int]
 
 
@@ -65,9 +67,9 @@ Grapefruit = on_alconna(
         Option(
             "签到",
         ),
-        Option(
+        Subcommand(
             "查询",
-            Args["target?", At],
+            Args["target;?", At],
         ),
         Option(
             "帮助",
@@ -90,11 +92,37 @@ Grapefruit = on_alconna(
         ),
         Subcommand(
             "管理",
+            Option(
+                "-at",
+                Args["at;?", At],
+            ),
+            Option(
+                "-qq",
+                Args["qq;?", int],
+            ),
+            Args["number", int],
+        ),
+        Option(
+            "数据",
+        ),
+        Subcommand(
+            "查看老婆",
+            Args["target;?", At],
+        ),
+        Option(
+            "娶群友",
+        ),
+        Option(
+            "换群友",
+        ),
+        Subcommand(
+            "抢群友",
             Args["target", At],
             Args["number", int],
         ),
     )
 )
+
 
 @Grapefruit.handle()
 async def handle_grapefruit(bot: Bot, groupevent: GroupMessageEvent, session: async_scoped_session, args: Event, result: Arparma = AlconnaMatches()):
@@ -107,20 +135,23 @@ async def handle_grapefruit(bot: Bot, groupevent: GroupMessageEvent, session: as
     data.ifCheck = -1
     data.combo = 0
     data.robNumber = 0
+    data.waifu = "single"
+    data.ifMerried = -1
 
     data2 = grapefruit()
-    data2.userName = 0
+    data2.userName = "0"
     data2.gfNumber = 0
     data2.ifCheck = -1
     data2.combo = 0
     data2.robNumber = 0
+    data2.waifu = "single"
+    data2.ifMerried = -1
 
     if not(await session.get(grapefruit, curUser)):
         session.add(data)
         await session.commit()
 
     data = await session.get(grapefruit, curUser)
-
 
     if result.find("签到"):
 
@@ -131,13 +162,139 @@ async def handle_grapefruit(bot: Bot, groupevent: GroupMessageEvent, session: as
                 data.combo = 1
 
             numberStart = 50 + data.combo
-            getNumber = random.randint(numberStart,numberStart + 50)
+            getNumber = random.randint(numberStart, numberStart + 50)
             data.gfNumber += getNumber
             data.ifCheck = curTime
             data.robNumber = 0
             await Grapefruit.send(f"签到成功！获得 {getNumber} 个柚子瓣！现在你有 {data.gfNumber} 个柚子瓣哦！连续签到了 {data.combo} 天喵！")
         else:
             await Grapefruit.send(f"你已经签到过了！")
+
+    elif result.find("娶群友"):
+
+        if data.ifMerried != curTime:
+            data.ifMerried = curTime
+            queryGroup = (await session.execute(select(grapefruit).order_by(grapefruit.userName))).all()
+            curGroupUsers = await bot.get_group_member_list(group_id=str(curGroup))
+            userList = []
+            for i in queryGroup:
+                if i.grapefruit.userName == data.userName:
+                    continue
+                flag = 1
+                for j in curGroupUsers:
+                    if str(j["user_id"]) == i.grapefruit.userName:
+                        flag = 0
+                if flag == 1:
+                    continue
+                userList.append(i.grapefruit.userName)
+            userCount = len(userList)
+
+            if userCount == 0:
+                data.waifu = "single"
+                await Grapefruit.send(f"悲报，娶群友未成功！今日只能换群友/抢群友，或被群友娶。")
+
+            data.waifu = userList[random.randint(0, userCount - 1)]
+            data2 = await session.get(grapefruit, data.waifu)
+
+            if data2.ifMerried != curTime or (data2.ifMerried == curTime and data2.waifu == "single"):
+                data2.ifMerried = curTime
+                data2.waifu = data.userName
+                waifuInfo = await get_user_info(bot, args, data.waifu)
+                waifuInfo = str(waifuInfo.user_avatar.get_url())
+                await Grapefruit.send(f"喜报，娶群友成功！今天你的群老婆是 " + UniMessage(At("user", data.waifu)) + "❤️！" + UniMessage(Image(url=waifuInfo)))
+            else:
+                data.waifu = "single"
+                await Grapefruit.send(f"悲报，娶群友未成功！今日只能换群友/抢群友，或被群友娶。")
+        elif data.ifMerried == curTime and data.waifu != "single":
+            await Grapefruit.send(f"你已经娶过了或被娶过了！")
+        else:
+            await Grapefruit.send(f"你貌似被抛弃了🥺！")
+
+    elif result.find("换群友"):
+
+        if data.gfNumber < 300:
+            await Grapefruit.finish("你的柚子瓣不够 300 个！")
+
+        queryGroup = (await session.execute(select(grapefruit).order_by(grapefruit.userName))).all()
+        curGroupUsers = await bot.get_group_member_list(group_id=str(curGroup))
+        userList = []
+        for i in queryGroup:
+            if i.grapefruit.userName == data.userName:
+                continue
+            if i.grapefruit.userName == data.waifu:
+                continue
+            flag = 1
+            for j in curGroupUsers:
+                if str(j["user_id"]) == i.grapefruit.userName:
+                    flag = 0
+            if flag == 1:
+                continue
+            userList.append(i.grapefruit.userName)
+
+        userCount = len(userList)
+        if userCount == 0:
+            await Grapefruit.send(f"悲报，换群友未成功！退还柚子瓣！")
+
+        if data.ifMerried == curTime and data.waifu != "single":
+            dataNTR1 = await session.get(grapefruit, data.waifu)
+            dataNTR1.waifu = "single"
+
+        data.ifMerried = curTime
+        data.waifu = userList[random.randint(0, userCount - 1)]
+        data2 = await session.get(grapefruit, data.waifu)
+
+        if data2.ifMerried == curTime and data2.waifu != "single":
+            dataNTR2 = await session.get(grapefruit, data2.waifu)
+            dataNTR2.waifu = "single"
+
+        data2.ifMerried = curTime
+        data2.waifu = data.userName
+
+        waifuInfo = await get_user_info(bot, args, data.waifu)
+        waifuInfo = str(waifuInfo.user_avatar.get_url())
+        await Grapefruit.send(f"喜报，换群友成功！今天你的群老婆是 " + UniMessage(At("user", data.waifu)) + "❤️！" + UniMessage(Image(url=waifuInfo)))
+        data.gfNumber -= 300
+
+    elif result.find("抢群友"):
+
+        curAt = result.query[At]("抢群友.target").target
+        if not(await session.get(grapefruit, curAt)):
+            data2.userName = curAt
+            session.add(data2)
+            session.commit()
+
+        data2 = await session.get(grapefruit, curAt)
+        robNumber = result.query[int]("抢群友.number")
+
+        if robNumber > data.gfNumber:
+            await Grapefruit.finish("你的柚子瓣不够！")
+        if robNumber <= 0:
+            await Grapefruit.finish("柚子瓣只能是正数个！")
+
+        data.gfNumber -= robNumber
+
+        checkSuc = random.randint(1,1000)
+        if checkSuc <= robNumber:
+            if data.ifMerried == curTime and data.waifu != "single":
+                dataNTR1 = await session.get(grapefruit, data.waifu)
+                dataNTR1.waifu = "single"
+
+            data.ifMerried = curTime
+            data.waifu = data2.userName
+
+            if data2.ifMerried == curTime and data2.waifu != "single":
+                dataNTR2 = await session.get(grapefruit, data2.waifu)
+                dataNTR2.waifu = "single"
+
+            data2.ifMerried = curTime
+            data2.waifu = data.userName
+
+            waifuInfo = await get_user_info(bot, args, data.waifu)
+            waifuInfo = str(waifuInfo.user_avatar.get_url())
+            await Grapefruit.send(f"喜报，抢群友成功！今天你的群老婆是 " + UniMessage(At("user", data.waifu)) + "❤️！" + UniMessage(Image(url=waifuInfo)))
+        else:
+            await Grapefruit.send(f"悲报，抢群友未成功！柚子瓣扣除 {robNumber}！")
+
 
 
     elif result.find("查询"):
@@ -220,7 +377,12 @@ async def handle_grapefruit(bot: Bot, groupevent: GroupMessageEvent, session: as
     排行：输出本群柚子瓣数排行榜
 - 功能子指令
     二次元图：（花费 25 柚子瓣）发送二次元图
-    管理 <@> <num>：（仅超级管理员）修改柚子瓣数目
+    查看老婆 [@]：查看你或别人的群老婆
+    娶群友：娶群友，可能失败。娶得的群友在各群互通，不会娶到其他群的群友。如果你的群老婆是其他群的，只会显示头像
+    换群友：（花费 300 柚子瓣）换随机群友，必成功，除非用指令的人太少
+    抢群友 <@> <num>：（花费 0 以上的柚子瓣）抢指定群友，花费柚子瓣越多越容易成功，花费 1000 及以上必定成功
+    管理 <@/num> <num>：（超级管理员）改柚子瓣数目
+    数据：（超级管理员）输出所有人的柚子瓣数目
 - 柚子瓣其他用途：
     戳一戳随机赠送
 - 注意事项：
@@ -228,7 +390,7 @@ async def handle_grapefruit(bot: Bot, groupevent: GroupMessageEvent, session: as
 
 by 柚初 Yurchiu Rin"""
 
-        font_size = 32
+        font_size = 41
         txt2img = Txt2Img()
         txt2img.set_font_size(font_size)
         pic = txt2img.draw(title, text)
@@ -289,7 +451,13 @@ by 柚初 Yurchiu Rin"""
         if curUser not in SUPERUSERS:
             await Grapefruit.finish("无权限。")
         
-        curAt = result.query[At]("管理.target").target
+        if result.find("管理.at"):
+            curAt = result.query[At]("管理.at.args.at").target
+        elif result.find("管理.qq"):
+            curAt = str(result.query[int]("管理.qq.args.qq"))
+        else:
+            await Grapefruit.finish("参数不足。")
+
         if not(await session.get(grapefruit, curAt)):
             data2.userName = curAt
             session.add(data2)
@@ -299,6 +467,57 @@ by 柚初 Yurchiu Rin"""
         giveNumber = result.query[int]("管理.number")
         data2.gfNumber += giveNumber
         await Grapefruit.send(f"管理员：对方柚子瓣变动 {giveNumber}，目前有 {data2.gfNumber} 个柚子瓣。")
+
+
+    elif result.find("数据"):
+
+        load_dotenv(".env")
+        SUPERUSERS = os.getenv("SUPERUSERS")
+        if curUser not in SUPERUSERS:
+            await Grapefruit.finish("无权限。")
+
+        queryGroup = (await session.execute(select(grapefruit).order_by(grapefruit.userName))).all()
+        gfDict = {}
+        for i in queryGroup:
+            gfDict[i.grapefruit.userName] = i.grapefruit.gfNumber
+        printList = sorted(gfDict.items(), key=lambda d: d[1], reverse=True)
+        text = "QQ 号 | 柚子瓣数目"
+        for i in printList:
+            text += "\n" + str(i[0]) + " " + str(i[1])
+        await Grapefruit.send(text)
+
+
+    elif result.find("查看老婆"):
+
+        if result.find("查看老婆.target"):
+
+            curAt = result.query[At]("查看老婆.target").target
+            if not(await session.get(grapefruit, curAt)):
+                data2.userName = curAt
+                session.add(data2)
+                session.commit()
+
+            data2 = await session.get(grapefruit, curAt)
+
+            if data2.ifMerried != curTime:
+                await Grapefruit.send(f"今天 ta 还未娶群友！")
+            elif data2.ifMerried == curTime and data2.waifu != "single":
+                waifuInfo = await get_user_info(bot, args, data2.waifu)
+                waifuInfo = str(waifuInfo.user_avatar.get_url())
+                await Grapefruit.send(f"今天 ta 的群老婆是 " + UniMessage(At("user", data2.waifu)) + "❤️！" + UniMessage(Image(url=waifuInfo)))
+            else:
+                await Grapefruit.send(f"ta 貌似被抛弃了🥺！")
+        else:
+            if data.ifMerried != curTime:
+                await Grapefruit.send(f"今天你还未娶群友！")
+            elif data.ifMerried == curTime and data.waifu != "single":
+                waifuInfo = await get_user_info(bot, args, data.waifu)
+                waifuInfo = str(waifuInfo.user_avatar.get_url())
+                logger.info(waifuInfo)
+                await Grapefruit.send(f"今天你的群老婆是 " + UniMessage(At("user", data.waifu)) + "❤️！" + UniMessage(Image(url=waifuInfo)))
+            else:
+                await Grapefruit.send(f"你貌似被抛弃了🥺！")
+
 
     await session.commit()
 

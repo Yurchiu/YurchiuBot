@@ -46,7 +46,7 @@ async def handle_help():
 - 复杂指令
     /撤回 <num1>[-num2]：撤回 Bot 区间内（倒数，从 0 开始数起，前闭后开）的所有消息
     @ /wordle [-l] [-d]：开始一局 wordle 游戏。-l 指定长度 -d 指定词典 【支持词典：GRE、考研、GMAT、专四、TOEFL、SAT、专八、IELTS、CET4、CET6】
-    /calc [num|帮助|结束]：开始一局计算器游戏。带参数表示选定第几关，否则为随机
+    /calc [num|帮助|结束|操作方式]：开始一局计算器游戏。带数字参数表示选定第几关，否则为随机
     /m bind [好友码]：舞萌查分器。绑定舞萌游戏数据
         /m b50：查询 Best 50。如果很长时间没有回复，则为超时，请重试。
         使用舞萌查分器之前请访问 https://github.com/KomoriDev/nonebot-plugin-lxns-maimai/wiki
@@ -55,7 +55,7 @@ async def handle_help():
         /表情详情 <表情名/关键词>
         /表情搜索 <关键词>
     /字符画 [图片]：接下来发送图片生成字符画
-    @ /text2img：接下来根据提示 文字转图片
+    @ /txt2img：接下来根据提示 文字转图片
 - 回复指令：
     /撤回：撤回 Bot 此消息
 - 注意
