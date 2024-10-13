@@ -368,7 +368,9 @@ async def handle_hismsg(msgevent: MessageEvent, event: Event, bot: Bot, session:
 
         data = HisMsg()
         data.msgId = msg_id
-        data.userName = str(msg["sender"]["nickname"])
+        data.userName = str(msg["sender"]["card"])
+        if str(msg["sender"]["card"]) == "":
+            data.userName = str(msg["sender"]["nickname"])
         data.userId = str(msg["sender"]["user_id"])
         data.userMsg = str(msg["raw_message"])
         data.msgGroup = curGroup
@@ -382,7 +384,7 @@ async def handle_hismsg(msgevent: MessageEvent, event: Event, bot: Bot, session:
         delId = str(result.query[int]("删除.del"))
         for i in queryGroup:
             if i.HisMsg.msgId == delId:
-                if i.HisMsg.userId == curId:
+                if i.HisMsg.userId == curId and not(curId in admin):
                     await hisMsg.finish("不能删除自己的语录！")
                 else:
                     i.HisMsg.ifDel = "deleted"
