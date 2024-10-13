@@ -39,7 +39,8 @@ class HisMsg(Model):
     userName: Mapped[str]
     userMsg: Mapped[str]
     msgGroup: Mapped[str]
-
+    userId: Mapped[str]
+    ifDel: Mapped[str]
 
 async def get_image_data():
     url = 'https://moe.jitsu.top/img/?type=json&sort=setu'
@@ -101,7 +102,7 @@ async def handle_help():
     /支付宝到账 <num>：发送到账语音
     /pk|PK|对抗 <@> [@]：根据群名片比较两人实力值
     /机器人叫 <str>：修改机器人群名片
-    /语录 [str]：随机输出来自本群的语录。正确拼写某人的昵称输出 ta 的语录
+    /语录 [@|删除 <num>]：随机输出来自本群的语录。@ 某人获得某人的语录。可删除指定编号语录
 - 交互指令
     /表情包制作：根据接下来的提示制作表情包
         /表情详情 <表情名/关键词>
@@ -334,37 +335,75 @@ async def handle_rename(bot: Bot, groupevent: GroupMessageEvent, args: Message =
 
 
 
-hisMsg = nonebot.on_command("语录", block=True)
+hisMsg = on_alconna(
+    Alconna(
+        ["/语录", "/黑历史"],
+        Args["at;?", At],
+        Option(
+            "删除",
+            Args["del", int],
+        ),
+    )
+)
 
 @hisMsg.handle()
-async def handle_hismsg(event: MessageEvent, bot: Bot, session: async_scoped_session, groupevent: GroupMessageEvent, args: Message = CommandArg()):
-    opt = args.extract_plain_text()
+async def handle_hismsg(msgevent: MessageEvent, event: Event, bot: Bot, session: async_scoped_session, groupevent: GroupMessageEvent, result: Arparma = AlconnaMatches()):
+    opt = ""
     curGroup = str(groupevent.group_id)
-    if event.reply:
-        msg_id = str(event.reply.message_id)
+    curId = str(event.get_user_id())
+    queryGroup = (await session.execute(select(HisMsg).order_by(HisMsg.msgId))).all()
+    length = len(queryGroup)
+    load_dotenv(".env")
+    admin = os.getenv("SUPERUSERS")
+
+    if msgevent.reply:
+        msg_id = str(msgevent.reply.message_id)
         msg = await bot.get_msg(message_id = msg_id)
+
+        for i in queryGroup:
+            if i.HisMsg.msgId == msg_id:
+                i.HisMsg.ifDel = ""
+                await session.commit()
+                await hisMsg.finish("语录已记录")
+
         data = HisMsg()
         data.msgId = msg_id
         data.userName = str(msg["sender"]["nickname"])
+        data.userId = str(msg["sender"]["user_id"])
         data.userMsg = str(msg["raw_message"])
         data.msgGroup = curGroup
+        data.ifDel = ""
         session.add(data)
+        logger.info(msg)
         await session.commit()
         await hisMsg.finish("语录已记录")
+
+    elif result.find("删除"):
+        delId = str(result.query[int]("删除.del"))
+        for i in queryGroup:
+            if i.HisMsg.msgId == delId:
+                if i.HisMsg.userId == curId:
+                    await hisMsg.finish("不能删除自己的语录！")
+                else:
+                    i.HisMsg.ifDel = "deleted"
+                    await session.commit()
+                    await hisMsg.finish("已删除")
+        await hisMsg.finish("未找到语录")
+
     else:
-        queryGroup = (await session.execute(select(HisMsg).order_by(HisMsg.msgId))).all()
-        length = len(queryGroup)
         if length == 0:
             await hisMsg.finish("无语录")
 
         ret = queryGroup[random.randint(0, length - 1)]
         count = 0
-        while ret.HisMsg.msgGroup != curGroup or (opt != "" and opt != ret.HisMsg.userName):
+        if result.find("at"):
+            opt = str(result.query[At]("at").target)
+        while ret.HisMsg.msgGroup != curGroup or (opt != "" and opt != ret.HisMsg.userId) or ret.HisMsg.ifDel == "deleted":
             ret = queryGroup[random.randint(0, length - 1)]
             count += 1
-            if count >= 50:
-                await hisMsg.finish("无语录或昵称错误")
+            if count >= 50000:
+                await hisMsg.finish("无语录")
 
-        msg = ret.HisMsg.userMsg
-        msg += "\n——" + ret.HisMsg.userName
+        msg = ret.HisMsg.userMsg + "（#" + ret.HisMsg.msgId + "）"
+        msg += "\n——" + ret.HisMsg.userName 
         await hisMsg.finish(msg)

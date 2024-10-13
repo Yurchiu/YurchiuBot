@@ -459,7 +459,7 @@ async def handle_grapefruit(bot: Bot, groupevent: GroupMessageEvent, session: as
     娶老婆：娶老婆，可能失败。娶得的群友在各群互通，不会娶到其他群的群友。如果你的群老婆是其他群的，只会显示头像
     换老婆：（花费 300 柚子瓣）换随机群友，必成功，除非用指令的人太少
     抢老婆 <@> [num]：（花费 0 以上的柚子瓣，默认 500）抢指定群友，花费柚子瓣越多越容易成功，花费 1000 及以上必定成功
-    打赌：（花费所有柚子瓣）一半概率获得翻倍数目的柚子瓣，一半概率将柚子瓣数目置为 50。
+    打赌：（花费所有柚子瓣）一半概率获得翻倍数目的柚子瓣，一半概率将柚子瓣数目置为原先的四分之一
 - 柚子瓣其他用途：
     戳一戳随机赠送
 - 注意事项：
@@ -591,8 +591,8 @@ by 柚初 Yurchiu Rin"""
 
         ret = random.randint(0,1)
         if ret == 0:
-            data.gfNumber = 50
-            await Grapefruit.send(f"赌局失败！柚子瓣数目变为 50！")
+            data.gfNumber //= 4
+            await Grapefruit.send(f"赌局失败！柚子瓣数目变为 {data.gfNumber}！")
         else:
             data.gfNumber += data.gfNumber
             await Grapefruit.send(f"赌局成功！柚子瓣数目翻倍！你现在有 {data.gfNumber} 个柚子瓣！")
