@@ -7,8 +7,9 @@ import httpx
 import json
 from nonebot import require
 require("nonebot_plugin_txt2img")
-require("nonebot_plugin_alconna")
 from nonebot_plugin_txt2img import Txt2Img
+from io import BytesIO
+require("nonebot_plugin_alconna")
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, MessageEvent, MessageSegment, Bot
 from nonebot.adapters.onebot.v12 import Bot
 from nonebot.adapters import Bot, Event, Message
@@ -33,6 +34,13 @@ __plugin_meta__ = PluginMetadata(
 )
 
 config = nonebot.get_plugin_config(Config)
+
+def set_txt2img(title, text, size):
+    txt2img = Txt2Img()
+    txt2img.set_font_size(size)
+    pic = txt2img.draw(title, text)
+    return pic
+
 
 class HisMsg(Model):
     msgId: Mapped[str] = mapped_column(primary_key=True)
@@ -95,20 +103,17 @@ async def handle_help():
     /撤回 <num1>[-num2]：撤回 Bot 区间内（倒数，从 0 开始数起，前闭后开）的所有消息
     @ /wordle [-l] [-d]：开始一局 wordle 游戏。-l 指定长度 -d 指定词典 【支持词典：GRE、考研、GMAT、专四、TOEFL、SAT、专八、IELTS、CET4、CET6】
     /calc [num|帮助|结束|操作方式]：开始一局计算器游戏。带数字参数表示选定第几关，否则为随机
-    /m bind [好友码]：舞萌查分器。绑定舞萌游戏数据
-        /m b50：查询 Best 50。若长时间没有回复，请重试
-        使用舞萌查分器之前请访问下一条消息给出的链接
-    柚子瓣相关指令：请使用命令 gf 柚子瓣帮助 查看帮助信息
     /支付宝到账 <num>：发送到账语音
     /pk|PK|对抗 <@> [@]：根据群名片比较两人实力值
     /机器人叫 <str>：修改机器人群名片
     /语录 [@|删除 <num>]：随机输出来自本群的语录。@ 某人获得某人的语录。可删除指定编号语录
+    柚子瓣相关指令：请使用命令 gf 柚子瓣帮助 查看帮助信息
+    舞萌相关指令：请使用命令 /帮助maimaiDX 查看帮助信息
 - 交互指令
     /表情包制作：根据接下来的提示制作表情包
         /表情详情 <表情名/关键词>
         /表情搜索 <关键词>
     /字符画 [图片]：接下来发送图片生成字符画
-    @ /txt2img：接下来根据提示 文字转图片
     /pjsk：接下来根据提示 生成 pjsk 表情包；使用 /pjsk -h 查看帮助
 - 回复指令：
     /撤回：撤回 Bot 此消息
@@ -121,13 +126,9 @@ async def handle_help():
 by 柚初 Yurchiu Rin"""
 
     font_size = 36
-    txt2img = Txt2Img()
-    txt2img.set_font_size(font_size)
-    pic = txt2img.draw(title, text)
-    helpmsg = MessageSegment.image(pic)
-    await help.send(helpmsg)
-    await help.finish(f"""项目地址：https://github.com/Yurchiu/YurchiuBot
-舞萌查分器（第三方）：https://github.com/KomoriDev/nonebot-plugin-lxns-maimai/wiki""")
+    pic = set_txt2img(title, text, font_size)
+    await help.send(MessageSegment.image(pic))
+    await help.finish(f"项目地址：https://github.com/Yurchiu/YurchiuBot")
 
 
 
@@ -149,11 +150,8 @@ gf 数据：输出所有人的柚子瓣数目
 by 柚初 Yurchiu Rin"""
 
     font_size = 40
-    txt2img = Txt2Img()
-    txt2img.set_font_size(font_size)
-    pic = txt2img.draw(title, text)
-    shelpmsg = MessageSegment.image(pic)
-    await shelp.finish(shelpmsg)
+    pic = set_txt2img(title, text, font_size)
+    await shelp.finish(MessageSegment.image(pic))
 
 
 
@@ -214,19 +212,6 @@ async def handle_repeat(args: Event):
 
     if str(msg) == '）':
         await repeat.finish("（")
-
-    if str(msg) == '好好好':
-        await repeat.send("是是是")
-        await repeat.finish("对对对")
-
-    if "柚初" in str(msg):
-        await repeat.finish("柚初太可爱了")
-
-    if "楚子莜" in str(msg):
-        await repeat.finish("楚子莜太可爱了")
-
-    if "Yurchiu" in str(msg):
-        await repeat.finish("Yurchiu 太可爱了")
 
     if "圆子" in str(msg):
         await repeat.finish("圆子是天才 M，无可置疑！")
@@ -337,11 +322,15 @@ async def handle_rename(bot: Bot, groupevent: GroupMessageEvent, args: Message =
 
 hisMsg = on_alconna(
     Alconna(
-        ["/语录", "/黑历史"],
+        ["/语录", "/黑历史", "/野史"],
         Args["at;?", At],
         Option(
             "删除",
             Args["del", int],
+        ),
+        Option(
+            "合订本",
+            Args["at;?", At],
         ),
     )
 )
@@ -368,7 +357,7 @@ async def handle_hismsg(msgevent: MessageEvent, event: Event, bot: Bot, session:
 
         data = HisMsg()
         data.msgId = msg_id
-        data.userName = str(msg["sender"]["card"])
+        data.userName = str(msg["sender"]["card"]) + "（" + str(msg["sender"]["nickname"]) + "）"
         if str(msg["sender"]["card"]) == "":
             data.userName = str(msg["sender"]["nickname"])
         data.userId = str(msg["sender"]["user_id"])
@@ -391,6 +380,32 @@ async def handle_hismsg(msgevent: MessageEvent, event: Event, bot: Bot, session:
                     await session.commit()
                     await hisMsg.finish("已删除")
         await hisMsg.finish("未找到语录")
+
+    elif result.find("合订本"):
+        at = 0
+        if result.find("合订本.at"):
+            at = str(result.query[At]("合订本.at").target)
+        msg_list = []
+        flag = 0
+
+        for i in queryGroup:
+            if (i.HisMsg.userId == at or at == 0) and i.HisMsg.msgGroup == curGroup and i.HisMsg.ifDel != "deleted":
+                msg_list.append(
+                    {
+                        "type": "node",
+                        "data": {
+                            "name": "你们要看的合订本",
+                            "uin": i.HisMsg.userId,
+                            "content": i.HisMsg.userMsg + "（#" + i.HisMsg.msgId + "）" + "\n——" + i.HisMsg.userName 
+                        }
+                    }
+                )
+                flag = 1
+
+        if flag == 1:
+            await bot.send_group_forward_msg(group_id = curGroup, messages = msg_list)
+        else:
+            await hisMsg.finish("无语录")
 
     else:
         if length == 0:
